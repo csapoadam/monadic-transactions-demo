@@ -5,28 +5,37 @@ from returns.maybe import Maybe, Some, Nothing ## pip install returns
 from returns.pipeline import flow
 from returns.pointfree import bind
 
+
 @dataclass(frozen=True)
 class Account:
     account_no: int
     owner: str
     balance: int
 
+## stubbed data for now...
+ACCOUNTS = {
+    13542: [Account(13542, "John Doe", 35000)],
+    18832: [Account(18832, "Mary Day", 42000)]
+}
+
 ## All getters and sanity-check related functions should return a Maybe[Account]
 def get_account(account_no: int) -> Maybe[Account]:
-    ## stubbed data
-    accounts = {
-        13542: Account(13542, "John Doe", 35000),
-        18832: Account(18832, "Mary Day", 42000)
-    }
-    acc = accounts.get(account_no)
-    if acc is not None:
-        return Some(acc)
+    ## use stub for now...
+    acc_history = ACCOUNTS.get(account_no)
+    if acc_history is not None:
+        return Some(acc_history[len(acc_history) - 1])
     return Nothing
 
 def account_if_has_funds(account: Account, amount: int) -> Maybe[Account]:
     if account.balance >= amount:
         return Some(account)
     return Nothing
+
+def commit_account_update(new_account: Account, transaction: 'Transaction') -> None:
+    ACCOUNTS[new_account.account_no].append(new_account)
+    print(transaction)
+    print(f"\t{ACCOUNTS[new_account.account_no][len(ACCOUNTS[new_account.account_no])-2]} -> ")
+    print(f"\t{new_account}")
 
 def debit_account(account: Account, amount: int) -> Account:
     return Account(account.account_no, account.owner, account.balance - amount)
@@ -35,14 +44,10 @@ def credit_account(account: Account, amount: int) -> Account:
     return Account(account.account_no, account.owner, account.balance + amount)
 
 
-
 class Transaction(ABC):
     @abstractmethod
     def try_execute(self) -> List[Maybe[Account]]:
         pass
-
-    def commit(self):
-        print(f"Added transaction {self} to the commit log")
 
 
 @dataclass(frozen=True)
@@ -57,7 +62,7 @@ class Debit(Transaction):
             bind(lambda acc: Maybe.from_value(debit_account(acc, self.amount))),
         )
 
-        result.bind(lambda acc: self.commit())
+        result.bind(lambda acc: commit_account_update(acc, self))
         return [result]    
 
 
@@ -77,7 +82,8 @@ class Transfer(Transaction):
         if source_account and dest_account:
             new_source_account = debit_account(source_account, self.amount)
             new_dest_account = credit_account(dest_account, self.amount)
-            self.commit()
+            commit_account_update(new_source_account, self)
+            commit_account_update(new_dest_account, self)
             return [Some(new_source_account), Some(new_dest_account)]
         return []
 
@@ -93,7 +99,5 @@ transactions = [
 
 for tr in transactions:
     new_accounts : List[Maybe[Account]] = tr.try_execute()
-    for acc in new_accounts:
-        acc.bind(lambda account: print(f"\t{account};"))
 
 
