@@ -36,10 +36,10 @@ class Transfer(Transaction):
     amount: int
 
     def try_execute(self, repo: Repository) -> List[Maybe[Account]]:
-        source_account: Maybe[Account] = repo.get_account(self.source_account_no)\
+        source_account = repo.get_account(self.source_account_no)\
             .bind(lambda sa: account_if_has_funds(sa, self.amount))\
             .value_or(None)
-        dest_account: Maybe[Account] = repo.get_account(self.dest_account_no)\
+        dest_account = repo.get_account(self.dest_account_no)\
             .value_or(None)
 
         if source_account and dest_account:
